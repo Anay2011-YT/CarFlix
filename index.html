@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CarFlix - Music & Maps</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="sidebar">
+    <img src="https://img.icons8.com/ios-filled/50/ffffff/waze.png" alt="Waze" onclick="showPanel('waze')" id="btn-waze" class="active" />
+    <img src="https://img.icons8.com/ios-filled/50/ffffff/spotify.png" alt="Spotify" onclick="showPanel('spotify')" id="btn-spotify" />
+  </div>
+
+  <div class="main">
+    <!-- Waze Panel -->
+    <iframe
+      id="panel-waze"
+      class="panel"
+      src="https://embed.waze.com/iframe?zoom=14&lat=26.9168671&lon=80.9325136&pin=1"
+      allowfullscreen
+    ></iframe>
+
+    <!-- Spotify Panel -->
+    <div id="panel-spotify" class="panel" style="display: none;">
+      <div class="playlist-grid">
+        <button onclick="loadSpotify('37i9dQZF1DXcBWIGoYBM5M')">Top Hits</button>
+        <button onclick="loadSpotify('37i9dQZF1DWXRqgorJj26U')">Pop Mix</button>
+        <button onclick="loadSpotify('37i9dQZF1DWUNIrSzKgQbP')">Lo-Fi Beats</button>
+        <button onclick="loadSpotify('37i9dQZF1DX70RN3TfWWJh')">Chill</button>
+        <button onclick="loadSpotify('37i9dQZF1DX76Wlfdnj7AP')">Workout</button>
+        <button onclick="loadSpotify('37i9dQZF1DX4o1oenSJRJd')">90s</button>
+        <button onclick="loadSpotify('37i9dQZF1DWTwnEm1IYyoj')">Hip-Hop</button>
+        <button onclick="loadSpotify('37i9dQZF1DX4E3UdUs7fUx')">Indie</button>
+        <button onclick="loadSpotify('37i9dQZF1DXaXB8fQg7xif')">Party</button>
+        <button onclick="loadSpotify('37i9dQZF1DWXRqgorJj26U')">Rock</button>
+      </div>
+      <iframe id="spotify-frame" class="spotify-iframe"
+        src="https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M"
+        frameborder="0"
+        allowtransparency="true"
+        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture">
+      </iframe>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
