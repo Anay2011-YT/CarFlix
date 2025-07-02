@@ -192,6 +192,26 @@
   function nextTrack() { if (player) player.nextTrack(); }
   function prevTrack() { if (player) player.previousTrack(); }
 
+  function transferPlayback() {
+    fetch("https://api.spotify.com/v1/me/player/play", {
+      method: "PUT",
+      headers: {
+        "Authorization": "Bearer " + spotifyToken,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        device_ids: [deviceId],
+        play: true
+      })
+    }).then(res => {
+      if (res.status === 204) {
+        console.log("🎵 Playback transferred!");
+      } else {
+        res.json().then(data => console.warn("Transfer error:", data));
+      }
+    });
+  }
+
   window.onSpotifyWebPlaybackSDKReady = () => {
     player = new Spotify.Player({
       name: "CarFlix Music",
@@ -203,6 +223,7 @@
       document.getElementById("trackInfo").innerText = "🎶 Spotify Ready";
       document.getElementById("spotifyLoginBtn").style.display = "none";
       document.getElementById("playerControls").style.display = "flex";
+      transferPlayback();
     });
 
     player.addListener("player_state_changed", state => {
