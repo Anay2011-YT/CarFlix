@@ -68,11 +68,22 @@
       align-items: center;
       background: black;
       color: white;
+      padding: 20px;
     }
 
     #trackInfo {
-      margin-bottom: 12px;
+      margin: 12px 0;
       font-size: 1.1rem;
+      text-align: center;
+    }
+
+    #albumArt {
+      width: 200px;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      border: 3px solid #4cd964;
     }
 
     .ctrl {
@@ -84,6 +95,22 @@
       margin: 4px;
       border-radius: 8px;
       cursor: pointer;
+    }
+
+    #progressBar {
+      width: 80%;
+      height: 6px;
+      background: #444;
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 16px auto;
+    }
+
+    #progress {
+      height: 100%;
+      background: #4cd964;
+      width: 0%;
+      transition: width 0.2s;
     }
 
     footer {
@@ -113,7 +140,9 @@
       </div>
       <div id="map"></div>
       <div id="musicPanel">
+        <img id="albumArt" src="" alt="Album Art" style="display:none;"/>
         <div id="trackInfo">🔒 Please login to Spotify</div>
+        <div id="progressBar"><div id="progress"></div></div>
         <button id="spotifyLoginBtn" class="ctrl" onclick="loginToSpotify()">Login to Spotify</button>
         <div id="playerControls" style="display: none;">
           <button class="ctrl" onclick="prevTrack()">⏮️</button>
@@ -180,8 +209,26 @@
       if (state) {
         const track = state.track_window.current_track;
         document.getElementById("trackInfo").innerText = `🎵 ${track.name} – ${track.artists.map(a => a.name).join(", ")}`;
+        if (track.album?.images?.[0]) {
+          document.getElementById("albumArt").src = track.album.images[0].url;
+          document.getElementById("albumArt").style.display = "block";
+        }
+        const progress = document.getElementById("progress");
+        const pct = (state.position / track.duration_ms) * 100;
+        progress.style.width = pct + "%";
       }
     });
+
+    setInterval(() => {
+      if (player) {
+        player.getCurrentState().then(state => {
+          if (state && state.track_window?.current_track) {
+            const pct = (state.position / state.duration) * 100;
+            document.getElementById("progress").style.width = pct + "%";
+          }
+        });
+      }
+    }, 1000);
 
     player.connect();
   };
