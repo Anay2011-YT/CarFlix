@@ -6,7 +6,6 @@
   <title>CarFlix Dashboard</title>
   <link href="https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.js"></script>
-  <script src="https://sdk.scdn.co/spotify-player.js"></script>
   <style>
     * { margin:0; box-sizing:border-box; }
     body {
@@ -138,43 +137,7 @@
   let spotifyToken = null;
   let player = null, deviceId = null;
 
-  // On Load
-  window.onload = () => {
-    const hash = new URLSearchParams(window.location.hash.substr(1));
-    if (hash.get("access_token")) {
-      spotifyToken = hash.get("access_token");
-      window.location.hash = "";
-      initSpotifyPlayer();
-    }
-    updateClock();
-    setInterval(updateClock, 1000);
-  };
-
-  function updateClock() {
-    const now = new Date();
-    document.getElementById("clock").innerText =
-      "🕒 " + now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-
-  function showApp(app) {
-    const mapBtn = document.getElementById("mapBtn");
-    const musicBtn = document.getElementById("musicBtn");
-    document.getElementById("map").style.display = app === "map" ? "block" : "none";
-    document.getElementById("sidebar").style.display = app === "map" ? "flex" : "none";
-    document.getElementById("musicPanel").style.display = app === "music" ? "flex" : "none";
-    mapBtn.classList.toggle("active", app === "map");
-    musicBtn.classList.toggle("active", app === "music");
-
-    if (app === "music" && spotifyToken) initSpotifyPlayer();
-  }
-
-  function loginToSpotify() {
-    const url = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`;
-    window.location = url;
-  }
-
-  function initSpotifyPlayer() {
-    if (!window.Spotify || player) return;
+  window.onSpotifyWebPlaybackSDKReady = () => {
     player = new Spotify.Player({
       name: "CarFlix Music",
       getOAuthToken: cb => cb(spotifyToken),
@@ -195,6 +158,40 @@
     });
 
     player.connect();
+  };
+
+  function loginToSpotify() {
+    const url = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`;
+    window.location = url;
+  }
+
+  window.onload = () => {
+    const hash = new URLSearchParams(window.location.hash.substr(1));
+    if (hash.get("access_token")) {
+      spotifyToken = hash.get("access_token");
+      window.location.hash = "";
+      if (typeof onSpotifyWebPlaybackSDKReady === 'function') onSpotifyWebPlaybackSDKReady();
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+  };
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById("clock").innerText =
+      "🕒 " + now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function showApp(app) {
+    const mapBtn = document.getElementById("mapBtn");
+    const musicBtn = document.getElementById("musicBtn");
+    document.getElementById("map").style.display = app === "map" ? "block" : "none";
+    document.getElementById("sidebar").style.display = app === "map" ? "flex" : "none";
+    document.getElementById("musicPanel").style.display = app === "music" ? "flex" : "none";
+    mapBtn.classList.toggle("active", app === "map");
+    musicBtn.classList.toggle("active", app === "music");
+
+    if (app === "music" && spotifyToken && !player) onSpotifyWebPlaybackSDKReady();
   }
 
   function togglePlay() { if (player) player.togglePlay(); }
@@ -206,5 +203,6 @@
   function simulate() {} function pauseRoute() {}
   function stopRoute() {}
 </script>
+<script src="https://sdk.scdn.co/spotify-player.js"></script>
 </body>
 </html>
