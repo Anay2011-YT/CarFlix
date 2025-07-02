@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>CarFlix Dashboard</title>
   <link href="https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.css" rel="stylesheet" />
-  <script src="https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.js"></script>
   <style>
     * { margin:0; box-sizing:border-box; }
     body {
@@ -137,44 +136,10 @@
   let spotifyToken = null;
   let player = null, deviceId = null;
 
-  window.onSpotifyWebPlaybackSDKReady = () => {
-    player = new Spotify.Player({
-      name: "CarFlix Music",
-      getOAuthToken: cb => cb(spotifyToken),
-    });
-
-    player.addListener("ready", ({ device_id }) => {
-      deviceId = device_id;
-      document.getElementById("trackInfo").innerText = "🎶 Spotify Ready";
-      document.getElementById("spotifyLoginBtn").style.display = "none";
-      document.getElementById("playerControls").style.display = "flex";
-    });
-
-    player.addListener("player_state_changed", state => {
-      if (state) {
-        const track = state.track_window.current_track;
-        document.getElementById("trackInfo").innerText = `🎵 ${track.name} – ${track.artists.map(a => a.name).join(", ")}`;
-      }
-    });
-
-    player.connect();
-  };
-
   function loginToSpotify() {
     const url = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`;
     window.location = url;
   }
-
-  window.onload = () => {
-    const hash = new URLSearchParams(window.location.hash.substr(1));
-    if (hash.get("access_token")) {
-      spotifyToken = hash.get("access_token");
-      window.location.hash = "";
-      if (typeof onSpotifyWebPlaybackSDKReady === 'function') onSpotifyWebPlaybackSDKReady();
-    }
-    updateClock();
-    setInterval(updateClock, 1000);
-  };
 
   function updateClock() {
     const now = new Date();
@@ -198,7 +163,50 @@
   function nextTrack() { if (player) player.nextTrack(); }
   function prevTrack() { if (player) player.previousTrack(); }
 
-  // -- MAP SETUP OMITTED FOR BREVITY --
+  window.onSpotifyWebPlaybackSDKReady = () => {
+    player = new Spotify.Player({
+      name: "CarFlix Music",
+      getOAuthToken: cb => cb(spotifyToken),
+    });
+
+    player.addListener("ready", ({ device_id }) => {
+      deviceId = device_id;
+      document.getElementById("trackInfo").innerText = "🎶 Spotify Ready";
+      document.getElementById("spotifyLoginBtn").style.display = "none";
+      document.getElementById("playerControls").style.display = "flex";
+    });
+
+    player.addListener("player_state_changed", state => {
+      if (state) {
+        const track = state.track_window.current_track;
+        document.getElementById("trackInfo").innerText = `🎵 ${track.name} – ${track.artists.map(a => a.name).join(", ")}`;
+      }
+    });
+
+    player.connect();
+  };
+
+  window.onload = () => {
+    const hash = new URLSearchParams(window.location.hash.substr(1));
+    if (hash.get("access_token")) {
+      spotifyToken = hash.get("access_token");
+      const expiresIn = parseInt(hash.get("expires_in") || "3600", 10);
+      localStorage.setItem("spotifyToken", spotifyToken);
+      localStorage.setItem("spotifyTokenExpiry", Date.now() + expiresIn * 1000);
+      window.location.hash = "";
+      onSpotifyWebPlaybackSDKReady();
+    } else {
+      const storedToken = localStorage.getItem("spotifyToken");
+      const expiry = parseInt(localStorage.getItem("spotifyTokenExpiry"));
+      if (storedToken && Date.now() < expiry) {
+        spotifyToken = storedToken;
+        onSpotifyWebPlaybackSDKReady();
+      }
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+  };
+
   function startRoute() {} function useCurrentLocation() {}
   function simulate() {} function pauseRoute() {}
   function stopRoute() {}
