@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>CarFlix Dashboard</title>
   <link href="https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.js"></script>
   <style>
     * { margin:0; box-sizing:border-box; }
     body {
@@ -71,46 +72,12 @@
       padding: 20px;
     }
 
-    #trackInfo {
-      margin: 12px 0;
-      font-size: 1.1rem;
-      text-align: center;
-    }
-
-    #albumArt {
-      width: 200px;
-      height: 200px;
-      object-fit: cover;
+    iframe.spotify {
       border-radius: 12px;
-      margin-bottom: 16px;
-      border: 3px solid #4cd964;
-    }
-
-    .ctrl {
-      background: #4cd964;
-      color: black;
       border: none;
-      padding: 10px 16px;
-      font-size: 1rem;
-      margin: 4px;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-    #progressBar {
-      width: 80%;
-      height: 6px;
-      background: #444;
-      border-radius: 6px;
-      overflow: hidden;
-      margin: 16px auto;
-    }
-
-    #progress {
-      height: 100%;
-      background: #4cd964;
-      width: 0%;
-      transition: width 0.2s;
+      width: 100%;
+      height: 380px;
+      max-width: 500px;
     }
 
     footer {
@@ -140,15 +107,7 @@
       </div>
       <div id="map"></div>
       <div id="musicPanel">
-        <img id="albumArt" src="" alt="Album Art" style="display:none;"/>
-        <div id="trackInfo">🔒 Please login to Spotify</div>
-        <div id="progressBar"><div id="progress"></div></div>
-        <button id="spotifyLoginBtn" class="ctrl" onclick="loginToSpotify()">Login to Spotify</button>
-        <div id="playerControls" style="display: none;">
-          <button class="ctrl" onclick="prevTrack()">⏮️</button>
-          <button class="ctrl" onclick="togglePlay()">▶️/⏸️</button>
-          <button class="ctrl" onclick="nextTrack()">⏭️</button>
-        </div>
+        <iframe class="spotify" style="border-radius:12px" src="https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M?utm_source=generator" width="100%" height="380" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
       </div>
     </div>
   </div>
@@ -158,17 +117,11 @@
   </footer>
 
 <script>
-  const clientId = "71fd3483d4b44d55b927ffbafd4954c4";
-  const redirectUri = window.location.origin + window.location.pathname;
-  const scopes = "streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state";
-
-  let spotifyToken = null;
-  let player = null, deviceId = null;
-
-  function loginToSpotify() {
-    const url = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`;
-    window.location = url;
-  }
+  window.onload = () => {
+    updateClock();
+    setInterval(updateClock, 1000);
+    initMap();
+  };
 
   function updateClock() {
     const now = new Date();
@@ -184,101 +137,95 @@
     document.getElementById("musicPanel").style.display = app === "music" ? "flex" : "none";
     mapBtn.classList.toggle("active", app === "map");
     musicBtn.classList.toggle("active", app === "music");
-
-    if (app === "music" && spotifyToken && !player) onSpotifyWebPlaybackSDKReady();
   }
 
-  function togglePlay() { if (player) player.togglePlay(); }
-  function nextTrack() { if (player) player.nextTrack(); }
-  function prevTrack() { if (player) player.previousTrack(); }
+  // Map functions
+  let map, marker, coordinates = [], animIndex = 0, animation, isPaused = false;
+  const maptilerKey = "ugTZPCyMGWoZWo0Nk5Mf";
+  const orsKey = "5b3ce3597851110001cf624851ef43534fc04e808410c180a68b1a24";
 
-  function transferPlayback() {
-    fetch("https://api.spotify.com/v1/me/player/play", {
-      method: "PUT",
+  function initMap() {
+    map = new maplibregl.Map({
+      container: 'map',
+      style: `https://api.maptiler.com/maps/streets/style.json?key=${maptilerKey}`,
+      center: [77.2090, 28.6139],
+      zoom: 10,
+      pitch: 60,
+      bearing: 0
+    });
+    map.addControl(new maplibregl.NavigationControl());
+  }
+
+  async function geocode(query) {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    if (!data.length) throw new Error("Location not found");
+    return [parseFloat(data[0].lon), parseFloat(data[0].lat)];
+  }
+
+  async function startRoute() {
+    const from = await geocode(document.getElementById("from").value);
+    const to = await geocode(document.getElementById("to").value);
+
+    const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+      method: "POST",
       headers: {
-        "Authorization": "Bearer " + spotifyToken,
+        "Authorization": orsKey,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        device_ids: [deviceId],
-        play: true
-      })
-    }).then(res => {
-      if (res.status === 204) {
-        console.log("🎵 Playback transferred!");
-      } else {
-        res.json().then(data => console.warn("Transfer error:", data));
-      }
+      body: JSON.stringify({ coordinates: [from, to] })
     });
+
+    const geojson = await res.json();
+    coordinates = geojson.features[0].geometry.coordinates;
+
+    if (map.getSource("route")) map.removeLayer("route"), map.removeSource("route");
+    map.addSource("route", { type: "geojson", data: geojson });
+    map.addLayer({
+      id: "route",
+      type: "line",
+      source: "route",
+      paint: { "line-color": "#4cd964", "line-width": 6 }
+    });
+
+    if (marker) marker.remove();
+    marker = new maplibregl.Marker({ color: "red" }).setLngLat(from).addTo(map);
+    map.flyTo({ center: from, zoom: 15, pitch: 60, bearing: 0 });
   }
 
-  window.onSpotifyWebPlaybackSDKReady = () => {
-    player = new Spotify.Player({
-      name: "CarFlix Music",
-      getOAuthToken: cb => cb(spotifyToken),
-    });
+  function useCurrentLocation() {
+    navigator.geolocation.getCurrentPosition(pos => {
+      document.getElementById("from").value = `${pos.coords.latitude},${pos.coords.longitude}`;
+    }, () => alert("Location access denied"));
+  }
 
-    player.addListener("ready", ({ device_id }) => {
-      deviceId = device_id;
-      document.getElementById("trackInfo").innerText = "🎶 Spotify Ready";
-      document.getElementById("spotifyLoginBtn").style.display = "none";
-      document.getElementById("playerControls").style.display = "flex";
-      transferPlayback();
-    });
+  function simulate() {
+    if (!coordinates.length || !marker) return;
+    clearInterval(animation);
+    isPaused = false;
+    animIndex = 0;
+    animation = setInterval(() => {
+      if (isPaused || animIndex >= coordinates.length) return;
+      marker.setLngLat(coordinates[animIndex]);
+      map.easeTo({ center: coordinates[animIndex], zoom: 17, pitch: 60, bearing: 0 });
+      animIndex++;
+    }, 500);
+  }
 
-    player.addListener("player_state_changed", state => {
-      if (state) {
-        const track = state.track_window.current_track;
-        document.getElementById("trackInfo").innerText = `🎵 ${track.name} – ${track.artists.map(a => a.name).join(", ")}`;
-        if (track.album?.images?.[0]) {
-          document.getElementById("albumArt").src = track.album.images[0].url;
-          document.getElementById("albumArt").style.display = "block";
-        }
-        const progress = document.getElementById("progress");
-        const pct = (state.position / track.duration_ms) * 100;
-        progress.style.width = pct + "%";
-      }
-    });
+  function pauseRoute() {
+    isPaused = true;
+    clearInterval(animation);
+  }
 
-    setInterval(() => {
-      if (player) {
-        player.getCurrentState().then(state => {
-          if (state && state.track_window?.current_track) {
-            const pct = (state.position / state.duration) * 100;
-            document.getElementById("progress").style.width = pct + "%";
-          }
-        });
-      }
-    }, 1000);
-
-    player.connect();
-  };
-
-  window.onload = () => {
-    const hash = new URLSearchParams(window.location.hash.substr(1));
-    if (hash.get("access_token")) {
-      spotifyToken = hash.get("access_token");
-      const expiresIn = parseInt(hash.get("expires_in") || "3600", 10);
-      localStorage.setItem("spotifyToken", spotifyToken);
-      localStorage.setItem("spotifyTokenExpiry", Date.now() + expiresIn * 1000);
-      window.location.hash = "";
-      onSpotifyWebPlaybackSDKReady();
-    } else {
-      const storedToken = localStorage.getItem("spotifyToken");
-      const expiry = parseInt(localStorage.getItem("spotifyTokenExpiry"));
-      if (storedToken && Date.now() < expiry) {
-        spotifyToken = storedToken;
-        onSpotifyWebPlaybackSDKReady();
-      }
+  function stopRoute() {
+    clearInterval(animation);
+    animIndex = 0;
+    isPaused = false;
+    if (marker && coordinates.length) {
+      marker.setLngLat(coordinates[0]);
+      map.flyTo({ center: coordinates[0], zoom: 15, pitch: 60, bearing: 0 });
     }
-    updateClock();
-    setInterval(updateClock, 1000);
-  };
-
-  function startRoute() {} function useCurrentLocation() {}
-  function simulate() {} function pauseRoute() {}
-  function stopRoute() {}
+  }
 </script>
-<script src="https://sdk.scdn.co/spotify-player.js"></script>
 </body>
 </html>
